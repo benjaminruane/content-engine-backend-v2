@@ -1,30 +1,41 @@
 // ---------- Output Type Guidelines ----------
 const OUTPUT_TYPE_PROMPTS = {
-  investor: `Audience: existing investors (LPs). Tone: concise, factual, professional. Avoid hype.
+  investor_commentary: `Audience: existing investors (LPs). Tone: concise, factual, professional. Avoid hype.
 Include: period performance, drivers, material changes, portfolio actions, risk/mitigants, cautious outlook.`,
 
-  detailed: `Audience: existing investors and internal stakeholders. Tone: thorough, neutral, compliance-safe.
+  detailed_investor_note: `Audience: existing investors and internal stakeholders. Tone: thorough, neutral, compliance-safe.
 Include: context, factual analysis, key metrics, caveats, assumptions.`,
 
-  press: `Audience: media & public. Tone: clear, objective, third-person. Avoid forward-looking promises.
+  press_release: `Audience: media & public. Tone: clear, objective, third-person. Avoid forward-looking promises.
 Include: headline, dateline, who/what/when/where/why, quotes, boilerplate.`,
 
-  linkedin: `Audience: professional network. Tone: crisp, accessible, compliance-aware.
+  linkedin_post: `Audience: professional network. Tone: crisp, accessible, compliance-aware.
 Include: short hook, impact bullets, link, hashtags.`
 };
 
 // ---------- Prompt Builder ----------
-function buildPrompt({ title, selectedTypes, notes, publicSearch, text }) {
-  const inlineSources = String(text || "").slice(0, 12000); // safety cap
+function buildPrompt({ title, outputTypes, notes, publicSearch, sources }) {
+  const filesText = (sources?.files || [])
+    .map((f) => `${f.name}:\n${String(f.text || "").slice(0, 3000)}`)
+    .join("\n\n");
 
-  const sections = (selectedTypes || []).map((t) => {
-    const guide = OUTPUT_TYPE_PROMPTS[t] || "(no guide available for this type)";
-    return `### ${t}
+  const urlsText = (sources?.urls || [])
+    .map((u) => `${u.url}:\n${String(u.text || "").slice(0, 3000)}`)
+    .join("\n\n");
+
+  const sections = (outputTypes || [])
+    .map((t) => {
+      const guide = OUTPUT_TYPE_PROMPTS[t] || "(no guide)";
+      return `### ${t}
 Guidelines:
 ${guide}
-
 Draft (from sources):`;
-  }).join("\n\n");
+    })
+    .join("\n\n");
+
+  const searchInstruction = publicSearch
+    ? "You may supplement the sources with your own general/public knowledge when helpful, but you must not contradict the provided sources. If there is a conflict, prefer the sources."
+    : "Base your writing strictly and only on the sources below. If information is missing, clearly state that it is not available in the supplied sources rather than guessing.";
 
   return `Title: ${title || "Untitled"}
 Public Domain Search: ${publicSearch ? "ON" : "OFF"}
@@ -32,24 +43,49 @@ Public Domain Search: ${publicSearch ? "ON" : "OFF"}
 User notes:
 ${notes || "(none)"}
 
-Combined Sources (files + URLs merged):
-${inlineSources || "(no source text provided)"}
+Assistant behaviour:
+${searchInstruction}
+
+Sources:
+${filesText}
+${urlsText}
 
 ${sections}`;
 }
 
+// ---------- System message based on publicSearch ----------
+function buildSystemMessage(publicSearch) {
+  if (publicSearch) {
+    return (
+      "You are a factual, compliance-safe assistant. " +
+      "You can use both the provided sources and your own general/public-domain knowledge. " +
+      "However, you must treat the sources as primary. If your knowledge conflicts with them, trust the sources. " +
+      "Do not speculate beyond well-established, non-controversial facts."
+    );
+  }
+
+  return (
+    "You are a factual, compliance-safe assistant. " +
+    "Base your answer strictly and only on the provided 'Sources' section. " +
+    "If a detail is not present in the sources, say that it is not available in the supplied material. " +
+    "Do not invent or infer facts that are not justified by the sources."
+  );
+}
+
 // ---------- Call OpenAI ----------
-async function callOpenAI({ modelId, temperature, maxTokens, prompt }) {
+async function callOpenAI({ modelId, temperature, maxTokens, prompt, publicSearch }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
-  // Strip "openai:" prefix
-  const model = (String(modelId).replace(/^openai:/, "")) || "gpt-4o-mini";
+  // Strip "openai:" prefix if present
+  const model = String(modelId || "").replace(/^openai:/, "") || "gpt-4o-mini";
+
+  const systemMessage = buildSystemMessage(publicSearch);
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${apiKey}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
@@ -57,10 +93,7 @@ async function callOpenAI({ modelId, temperature, maxTokens, prompt }) {
       temperature: typeof temperature === "number" ? temperature : 0.3,
       max_tokens: typeof maxTokens === "number" ? maxTokens : 1200,
       messages: [
-        {
-          role: "system",
-          content: "You are a factual, compliance-safe assistant that only writes from provided sources."
-        },
+        { role: "system", content: systemMessage },
         { role: "user", content: prompt }
       ]
     })
@@ -96,21 +129,27 @@ export default async function handler(req, res) {
       temperature,
       maxTokens,
       publicSearch,
+      outputTypes,
       title,
       notes,
-      selectedTypes,
-      text
-    } = req.body || {};
+      sources
+    } = req.body;
 
     const prompt = buildPrompt({
       title,
-      selectedTypes,
+      outputTypes,
       notes,
       publicSearch,
-      text
+      sources
     });
 
-    const output = await callOpenAI({ modelId, temperature, maxTokens, prompt });
+    const output = await callOpenAI({
+      modelId,
+      temperature,
+      maxTokens,
+      prompt,
+      publicSearch
+    });
 
     return res.status(200).json({ output });
   } catch (err) {
