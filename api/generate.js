@@ -14,14 +14,22 @@ Include: short hook, impact bullets, link, hashtags.`
 };
 
 // ---------- Prompt Builder ----------
-function buildPrompt({ title, outputTypes, notes, publicSearch, sources }) {
-  const filesText = (sources?.files || [])
+function buildPrompt({ title, outputTypes, notes, publicSearch, sources, text }) {
+  const filesArr = (sources && sources.files) || [];
+  const urlsArr = (sources && sources.urls) || [];
+
+  let filesText = filesArr
     .map((f) => `${f.name}:\n${String(f.text || "").slice(0, 3000)}`)
     .join("\n\n");
 
-  const urlsText = (sources?.urls || [])
+  let urlsText = urlsArr
     .map((u) => `${u.url}:\n${String(u.text || "").slice(0, 3000)}`)
     .join("\n\n");
+
+  // 🔁 Fallback: if no structured sources but combined text is provided
+  if (!filesText && !urlsText && text) {
+    filesText = `Combined text:\n${String(text).slice(0, 6000)}`;
+  }
 
   const sections = (outputTypes || [])
     .map((t) => {
@@ -73,7 +81,13 @@ function buildSystemMessage(publicSearch) {
 }
 
 // ---------- Call OpenAI ----------
-async function callOpenAI({ modelId, temperature, maxTokens, prompt, publicSearch }) {
+async function callOpenAI({
+  modelId,
+  temperature,
+  maxTokens,
+  prompt,
+  publicSearch
+}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
@@ -130,17 +144,22 @@ export default async function handler(req, res) {
       maxTokens,
       publicSearch,
       outputTypes,
+      selectedTypes,
       title,
       notes,
-      sources
+      sources,
+      text
     } = req.body;
+
+    const effectiveOutputTypes = outputTypes || selectedTypes || [];
 
     const prompt = buildPrompt({
       title,
-      outputTypes,
+      outputTypes: effectiveOutputTypes,
       notes,
       publicSearch,
-      sources
+      sources,
+      text
     });
 
     const output = await callOpenAI({
