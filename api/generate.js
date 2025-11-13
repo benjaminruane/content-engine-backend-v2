@@ -1,43 +1,39 @@
 // ---------- Output Type Guidelines ----------
 const OUTPUT_TYPE_PROMPTS = {
-  investor_commentary: `Audience: existing investors (LPs). Tone: concise, factual, professional. Avoid hype.
+  investor: `Audience: existing investors (LPs). Tone: concise, factual, professional. Avoid hype.
 Include: period performance, drivers, material changes, portfolio actions, risk/mitigants, cautious outlook.`,
 
-  detailed_investor_note: `Audience: existing investors and internal stakeholders. Tone: thorough, neutral, compliance-safe.
+  detailed: `Audience: existing investors and internal stakeholders. Tone: thorough, neutral, compliance-safe.
 Include: context, factual analysis, key metrics, caveats, assumptions.`,
 
-  press_release: `Audience: media & public. Tone: clear, objective, third-person. Avoid forward-looking promises.
+  press: `Audience: media & public. Tone: clear, objective, third-person. Avoid forward-looking promises.
 Include: headline, dateline, who/what/when/where/why, quotes, boilerplate.`,
 
-  linkedin_post: `Audience: professional network. Tone: crisp, accessible, compliance-aware.
+  linkedin: `Audience: professional network. Tone: crisp, accessible, compliance-aware.
 Include: short hook, impact bullets, link, hashtags.`
 };
 
 // ---------- Prompt Builder ----------
-function buildPrompt({ title, outputTypes, notes, publicSearch, sources }) {
-  const filesText = (sources?.files || [])
-    .map(f => `${f.name}:\n${String(f.text || '').slice(0, 3000)}`).join('\n\n');
+function buildPrompt({ title, selectedTypes, notes, publicSearch, text }) {
+  const inlineSources = String(text || "").slice(0, 12000); // safety cap
 
-  const urlsText = (sources?.urls || [])
-    .map(u => `${u.url}:\n${String(u.text || '').slice(0, 3000)}`).join('\n\n');
-
-  const sections = (outputTypes || []).map(t => {
-    const guide = OUTPUT_TYPE_PROMPTS[t] || '(no guide)';
+  const sections = (selectedTypes || []).map((t) => {
+    const guide = OUTPUT_TYPE_PROMPTS[t] || "(no guide available for this type)";
     return `### ${t}
 Guidelines:
 ${guide}
-Draft (from sources):`;
-  }).join('\n\n');
 
-  return `Title: ${title || 'Untitled'}
-Public Domain Search: ${publicSearch ? 'ON' : 'OFF'}
+Draft (from sources):`;
+  }).join("\n\n");
+
+  return `Title: ${title || "Untitled"}
+Public Domain Search: ${publicSearch ? "ON" : "OFF"}
 
 User notes:
-${notes || '(none)'}
+${notes || "(none)"}
 
-Sources:
-${filesText}
-${urlsText}
+Combined Sources (files + URLs merged):
+${inlineSources || "(no source text provided)"}
 
 ${sections}`;
 }
@@ -48,13 +44,13 @@ async function callOpenAI({ modelId, temperature, maxTokens, prompt }) {
   if (!apiKey) throw new Error("Missing OPENAI_API_KEY");
 
   // Strip "openai:" prefix
-  const model = (String(modelId).replace(/^openai:/, '')) || 'gpt-4o-mini';
+  const model = (String(modelId).replace(/^openai:/, "")) || "gpt-4o-mini";
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/json"
     },
     body: JSON.stringify({
       model,
@@ -95,8 +91,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { modelId, temperature, maxTokens, publicSearch, outputTypes, title, notes, sources } = req.body;
-    const prompt = buildPrompt({ title, outputTypes, notes, publicSearch, sources });
+    const {
+      modelId,
+      temperature,
+      maxTokens,
+      publicSearch,
+      title,
+      notes,
+      selectedTypes,
+      text
+    } = req.body || {};
+
+    const prompt = buildPrompt({
+      title,
+      selectedTypes,
+      notes,
+      publicSearch,
+      text
+    });
+
     const output = await callOpenAI({ modelId, temperature, maxTokens, prompt });
 
     return res.status(200).json({ output });
