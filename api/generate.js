@@ -1,23 +1,23 @@
-// backend/routes/generate.js
-const express = require("express");
-const OpenAI = require("openai");
+import OpenAI from "openai";
 
-const router = express.Router();
-
-// Make sure OPENAI_API_KEY is set in your environment (Vercel project settings)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-router.post("/generate", async (req, res) => {
+export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
     const {
+      mode = "generate",
       title,
       notes,
       selectedTypes,
       publicSearch,
       text,
-      previous, // <-- matches what your frontend sends
+      previousContent,
       modelId = "gpt-4o-mini",
       temperature = 0.3,
       maxTokens = 2048,
@@ -39,16 +39,13 @@ You produce clear, concise, professional writing suitable for:
 
 You follow the user's notes and respect the chosen output types.
 When rewriting, you **preserve the structure and core points of the previous draft**
-unless the user explicitly asks for a major restructure.
+unless the user explicitly asks for major restructuring.
 `.trim();
 
-    const isRewrite =
-      typeof previous === "string" && previous.trim().length > 0;
+    let messages = [];
 
-    let messages;
-
-    if (isRewrite) {
-      // 🔁 REWRITE PATH – treat "previous" as the base draft to tweak
+    if (mode === "rewrite" && previousContent) {
+      // --- REWRITE PATH ---
       messages = [
         {
           role: "system",
@@ -56,44 +53,36 @@ unless the user explicitly asks for a major restructure.
         },
         {
           role: "user",
-          content: `You are revising an existing draft. Make **targeted edits only**, unless the instructions explicitly request broader changes.
+          content: `You are revising an existing draft. Make targeted edits only.
 
 Goals:
-- Preserve overall structure, sections, and key points of the existing draft.
-- Improve clarity, tone, flow, and correctness.
-- Apply the rewrite instructions.
-- Use the source material only to refine details or correct facts, not to rewrite from scratch.
+- Preserve the existing structure
+- Keep the major points and order
+- Improve clarity, accuracy, tone, and flow
+- Apply the rewrite instructions
+- Use source material only to refine details, not to replace the draft
 
 Output types: ${typesLabel}
 Title: ${title || "(untitled)"}
-Include public domain search context: ${
-            publicSearch
-              ? "Yes (already applied on backend if enabled)"
-              : "No – rely only on provided sources."
-          }
+Public domain search: ${publicSearch ? "Enabled" : "Disabled"}
 `,
         },
         {
           role: "user",
-          content: `REWRITE INSTRUCTIONS:\n${
-            notes || "(no additional instructions provided)"
-          }`,
+          content: `REWRITE INSTRUCTIONS:\n${notes || "(none provided)"}`,
         },
         {
           role: "user",
-          content: `EXISTING DRAFT (KEEP STRUCTURE, TWEAK CONTENT):\n\n${
-            previous || ""
-          }`,
+          content: `EXISTING DRAFT:\n\n${previousContent}`,
         },
         {
           role: "user",
-          content: `SOURCE MATERIAL (REFERENCE ONLY, DO NOT REPLACE DRAFT):\n\n${
-            text || "(no extra source material provided)"
-          }`,
-        },
+          content: `SOURCE MATERIAL (REFERENCE ONLY):\n\n${text || "(none)"}`
+        }
       ];
+
     } else {
-      // 🆕 GENERATE PATH – fresh draft from sources
+      // --- GENERATE PATH ---
       messages = [
         {
           role: "system",
@@ -101,26 +90,20 @@ Include public domain search context: ${
         },
         {
           role: "user",
-          content: `You are creating a **new draft**.
+          content: `Create a new draft.
 
 Output types: ${typesLabel}
 Title: ${title || "(untitled)"}
-Include public domain search context: ${
-            publicSearch
-              ? "Yes (already applied on backend if enabled)"
-              : "No – rely only on provided sources."
-          }
+Public domain search: ${publicSearch ? "Enabled" : "Disabled"}
 
-Notes / constraints:
-${notes || "(none provided)"}
+Notes:
+${notes || "(none)"}
 `,
         },
         {
           role: "user",
-          content: `SOURCE MATERIAL (PRIMARY BASIS FOR THE DRAFT):\n\n${
-            text || "(no source text provided)"
-          }`,
-        },
+          content: `SOURCE MATERIAL:\n\n${text || "(none provided)"}`
+        }
       ];
     }
 
@@ -135,17 +118,13 @@ ${notes || "(none provided)"}
       completion.choices?.[0]?.message?.content?.trim() ||
       "[No content generated]";
 
-    res.json({
-      mode: isRewrite ? "rewrite" : "generate",
-      output,
-    });
+    return res.status(200).json({ mode, output });
+
   } catch (err) {
     console.error("Error in /api/generate:", err);
-    res.status(500).json({
+    return res.status(500).json({
       error: "Error generating content",
-      details: err?.message ?? String(err),
+      details: err?.message || String(err),
     });
   }
-});
-
-module.exports = router;
+}
