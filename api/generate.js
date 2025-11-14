@@ -1,10 +1,10 @@
-// backend/routes/generate.js (or wherever your route lives)
-import express from "express";
-import OpenAI from "openai";
+// backend/routes/generate.js
+const express = require("express");
+const OpenAI = require("openai");
 
 const router = express.Router();
 
-// Make sure OPENAI_API_KEY is set in your environment
+// Make sure OPENAI_API_KEY is set in your environment (Vercel project settings)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -12,13 +12,12 @@ const openai = new OpenAI({
 router.post("/generate", async (req, res) => {
   try {
     const {
-      mode = "generate", // "generate" | "rewrite"
       title,
       notes,
       selectedTypes,
       publicSearch,
       text,
-      previousContent,
+      previous, // <-- matches what your frontend sends
       modelId = "gpt-4o-mini",
       temperature = 0.3,
       maxTokens = 2048,
@@ -43,10 +42,13 @@ When rewriting, you **preserve the structure and core points of the previous dra
 unless the user explicitly asks for a major restructure.
 `.trim();
 
+    const isRewrite =
+      typeof previous === "string" && previous.trim().length > 0;
+
     let messages;
 
-    if (mode === "rewrite" && previousContent) {
-      // 🔁 REWRITE PATH – treat previousContent as the base to tweak
+    if (isRewrite) {
+      // 🔁 REWRITE PATH – treat "previous" as the base draft to tweak
       messages = [
         {
           role: "system",
@@ -64,20 +66,30 @@ Goals:
 
 Output types: ${typesLabel}
 Title: ${title || "(untitled)"}
-Include public domain search context: ${publicSearch ? "Yes (already applied on backend if enabled)" : "No – rely only on provided sources."}
+Include public domain search context: ${
+            publicSearch
+              ? "Yes (already applied on backend if enabled)"
+              : "No – rely only on provided sources."
+          }
 `,
         },
         {
           role: "user",
-          content: `REWRITE INSTRUCTIONS:\n${notes || "(no additional instructions provided)"}`,
+          content: `REWRITE INSTRUCTIONS:\n${
+            notes || "(no additional instructions provided)"
+          }`,
         },
         {
           role: "user",
-          content: `EXISTING DRAFT (KEEP STRUCTURE, TWEAK CONTENT):\n\n${previousContent}`,
+          content: `EXISTING DRAFT (KEEP STRUCTURE, TWEAK CONTENT):\n\n${
+            previous || ""
+          }`,
         },
         {
           role: "user",
-          content: `SOURCE MATERIAL (REFERENCE ONLY, DO NOT REPLACE DRAFT):\n\n${text || "(no extra source material provided)"}`,
+          content: `SOURCE MATERIAL (REFERENCE ONLY, DO NOT REPLACE DRAFT):\n\n${
+            text || "(no extra source material provided)"
+          }`,
         },
       ];
     } else {
@@ -93,7 +105,11 @@ Include public domain search context: ${publicSearch ? "Yes (already applied on 
 
 Output types: ${typesLabel}
 Title: ${title || "(untitled)"}
-Include public domain search context: ${publicSearch ? "Yes (already applied on backend if enabled)" : "No – rely only on provided sources."}
+Include public domain search context: ${
+            publicSearch
+              ? "Yes (already applied on backend if enabled)"
+              : "No – rely only on provided sources."
+          }
 
 Notes / constraints:
 ${notes || "(none provided)"}
@@ -101,7 +117,9 @@ ${notes || "(none provided)"}
         },
         {
           role: "user",
-          content: `SOURCE MATERIAL (PRIMARY BASIS FOR THE DRAFT):\n\n${text || "(no source text provided)"}`,
+          content: `SOURCE MATERIAL (PRIMARY BASIS FOR THE DRAFT):\n\n${
+            text || "(no source text provided)"
+          }`,
         },
       ];
     }
@@ -118,7 +136,7 @@ ${notes || "(none provided)"}
       "[No content generated]";
 
     res.json({
-      mode,
+      mode: isRewrite ? "rewrite" : "generate",
       output,
     });
   } catch (err) {
@@ -130,4 +148,4 @@ ${notes || "(none provided)"}
   }
 });
 
-export default router;
+module.exports = router;
