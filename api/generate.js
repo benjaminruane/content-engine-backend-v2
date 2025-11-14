@@ -89,10 +89,15 @@ When rewriting, you **preserve the structure and core points of the previous dra
 unless the user explicitly asks for a major restructure.
 `.trim();
 
+    const hardLengthLine =
+      wordLimit && Number.isFinite(wordLimit)
+        ? `\nHARD LENGTH LIMIT: The final answer MUST be ${wordLimit} words or fewer. If necessary, aggressively summarize to meet this limit.\n`
+        : "";
+
     let messages;
 
     // -----------------------------
-    // 2) Rewrite path – targeted edits, not full rewrite
+    // 2) Rewrite path – targeted edits
     // -----------------------------
     if (mode === "rewrite" && previousContent) {
       messages = [
@@ -102,15 +107,14 @@ unless the user explicitly asks for a major restructure.
         },
         {
           role: "user",
-          content: `You are revising an existing draft.
+          content: `You are revising an existing draft. Make **targeted edits only** unless the instructions explicitly request broader changes.
 
-Rewrite goals (VERY IMPORTANT):
-- Make **targeted edits** to the existing draft.
-- Preserve the overall structure, section order, and key points where possible.
+Goals:
+- Preserve overall structure, section order, and key points of the existing draft where possible.
 - Improve clarity, tone, flow, and correctness.
-- **STRICTLY follow the rewrite instructions**, especially any word or length limits.
-- If the instructions specify a hard length (for example "max 100 words"), you MUST keep the final answer within that limit, even if you must aggressively summarize.
-
+- Apply the rewrite instructions carefully.
+- Use the source material only to refine details or correct facts, not to completely rewrite from scratch.
+${hardLengthLine}
 Context:
 - Output types: ${typesLabel}
 - Title: ${title || "(untitled)"}
@@ -123,24 +127,24 @@ Context:
         },
         {
           role: "user",
-          content: `REWRITE INSTRUCTIONS (APPLY STRICTLY):\n${
+          content: `REWRITE INSTRUCTIONS:\n${
             notes || "(no additional instructions provided)"
           }`,
         },
         {
           role: "user",
-          content: `EXISTING DRAFT (THIS IS THE BASE YOU EDIT):\n\n${previousContent}`,
+          content: `EXISTING DRAFT (BASE TEXT TO EDIT):\n\n${previousContent}`,
         },
         {
           role: "user",
-          content: `SOURCE MATERIAL (REFERENCE ONLY. Use this to correct or sharpen details, but do NOT replace the structure of the draft):\n\n${
+          content: `SOURCE MATERIAL (REFERENCE ONLY):\n\n${
             text || "(no extra source material provided)"
           }`,
         },
       ];
     } else {
       // -----------------------------
-      // 3) Generate path – fresh draft from sources
+      // 3) Generate path – fresh draft
       // -----------------------------
       messages = [
         {
@@ -158,7 +162,7 @@ Include public domain search context: ${
               ? "Yes (already applied on backend if enabled)"
               : "No – rely only on provided sources."
           }
-
+${hardLengthLine}
 Notes / constraints:
 ${notes || "(none provided)"}
 `,
@@ -173,7 +177,7 @@ ${notes || "(none provided)"}
     }
 
     // -----------------------------
-    // 4) Call OpenAI
+    // 4) First call to OpenAI
     // -----------------------------
     const completion = await openai.chat.completions.create({
       model: modelId,
@@ -187,7 +191,7 @@ ${notes || "(none provided)"}
       "[No content generated]";
 
     // -----------------------------
-    // 5) Enforce word limit (if detected)
+    // 5) If word limit exists, intelligently compress
     // -----------------------------
     if (
       wordLimit &&
@@ -196,11 +200,56 @@ ${notes || "(none provided)"}
       wordLimit > 0
     ) {
       const words = output.split(/\s+/).filter(Boolean);
-      if (words.length > wordLimit) {
-        output = words.slice(0, wordLimit).join(" ");
+      const originalCount = words.length;
+
+      if (originalCount > wordLimit) {
         console.log(
-          `Applied hard word limit (${wordLimit}), original length was ${words.length} words.`
+          `Output over word limit (${originalCount} > ${wordLimit}). Requesting compression pass.`
         );
+
+        // Second pass: explicitly ask model to compress to <= wordLimit words
+        const compressionMessages = [
+          {
+            role: "system",
+            content:
+              "You are a careful editor. Your job is to shorten text while preserving its essential meaning.",
+          },
+          {
+            role: "user",
+            content: `The following text is about ${originalCount} words long. 
+The HARD LIMIT is ${wordLimit} words.
+
+Rewrite it so that it is **${wordLimit} words or fewer** while keeping the key ideas and a natural, readable flow.
+
+If necessary, remove less important details. Do not add new ideas.
+
+TEXT TO COMPRESS:
+${output}
+`,
+          },
+        ];
+
+        const compressionCompletion = await openai.chat.completions.create({
+          model: modelId,
+          temperature, // you could lower this to make it more deterministic, e.g. 0.2
+          max_tokens: maxTokens,
+          messages: compressionMessages,
+        });
+
+        let compressed =
+          compressionCompletion.choices?.[0]?.message?.content?.trim() ||
+          output;
+
+        // Final safety check – if still over, *then* hard-trim as a last resort
+        const compressedWords = compressed.split(/\s+/).filter(Boolean);
+        if (compressedWords.length > wordLimit) {
+          console.log(
+            `Compression still over limit (${compressedWords.length} > ${wordLimit}). Applying last-resort trim.`
+          );
+          compressed = compressedWords.slice(0, wordLimit).join(" ");
+        }
+
+        output = compressed;
       }
     }
 
