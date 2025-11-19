@@ -1,7 +1,11 @@
 // api/rewrite.js
 
 import OpenAI from "openai";
-import { PROMPT_RECIPES } from "../helpers/promptRecipes.js";
+import {
+  PROMPT_RECIPES,
+  SCENARIO_INSTRUCTIONS,
+} from "../helpers/promptRecipes.js";
+
 import { fillTemplate } from "../helpers/template.js";
 import {
   DEFAULT_STYLE_GUIDE,
@@ -64,7 +68,7 @@ export default async function handler(req, res) {
       pack.templates.press_release;
 
     // Turn the generation template into a rewrite template
-    const rewriteTemplate = `
+        const rewriteTemplate = `
 You are to improve and refine an existing draft of a {{outputTypeLabel}}.
 
 Scenario: {{scenario}}
@@ -84,18 +88,25 @@ Here is the draft to rewrite:
 Produce a refined, professional version of the draft.
 `;
 
-    // Fill template
-    const userPrompt = fillTemplate(rewriteTemplate, {
+    const userPromptBase = fillTemplate(rewriteTemplate, {
       text,
       notes,
       scenario,
       outputTypeLabel: outputType.replace("_", " "),
     });
 
+    const scenarioExtra =
+      SCENARIO_INSTRUCTIONS[scenario] || SCENARIO_INSTRUCTIONS.default;
+
+    const userPrompt =
+      userPromptBase +
+      "\n\nScenario-specific guidance:\n" +
+      scenarioExtra.trim() +
+      "\n";
+
     const systemPrompt =
       pack.systemPrompt + "\n\nSTYLE GUIDE:\n" + styleGuide;
 
-    // Model call
     const completion = await client.chat.completions.create({
       model: modelId,
       temperature,
@@ -105,6 +116,7 @@ Produce a refined, professional version of the draft.
         { role: "user", content: userPrompt },
       ],
     });
+
 
     const rewritten =
       completion.choices?.[0]?.message?.content?.trim() ||
