@@ -1,7 +1,11 @@
 // api/generate.js
 
 import OpenAI from "openai";
-import { PROMPT_RECIPES } from "../helpers/promptRecipes.js";
+import {
+  PROMPT_RECIPES,
+  SCENARIO_INSTRUCTIONS,
+} from "../helpers/promptRecipes.js";
+
 import { fillTemplate } from "../helpers/template.js";
 import {
   DEFAULT_STYLE_GUIDE,
@@ -67,12 +71,21 @@ export default async function handler(req, res) {
         promptPack.templates[outputType] ||
         promptPack.templates.press_release;
 
-      const userPrompt = fillTemplate(template, {
+            const userPromptBase = fillTemplate(template, {
         title,
         notes,
         text,
         scenario,
       });
+
+      const scenarioExtra =
+        SCENARIO_INSTRUCTIONS[scenario] || SCENARIO_INSTRUCTIONS.default;
+
+      const userPrompt =
+        userPromptBase +
+        "\n\nScenario-specific guidance:\n" +
+        scenarioExtra.trim() +
+        "\n";
 
       const systemPrompt =
         promptPack.systemPrompt + "\n\nSTYLE GUIDE:\n" + styleGuide;
@@ -86,6 +99,7 @@ export default async function handler(req, res) {
           { role: "user", content: userPrompt },
         ],
       });
+
 
       const output =
         completion.choices?.[0]?.message?.content?.trim() ||
