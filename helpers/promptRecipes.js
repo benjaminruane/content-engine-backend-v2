@@ -12,6 +12,32 @@ Follow the provided style guide exactly.
 Use a clear, structured format and avoid marketing fluff.
 `;
 
+// Extra guidance for different scenarios
+export const SCENARIO_INSTRUCTIONS = {
+  new_investment: `
+- Emphasise what was acquired or invested in, who the counterparties are, and the strategic rationale.
+- Include, where appropriate, the strategy, sector, and how this fits into the firm's investment themes.
+- If size or financial terms are not disclosed, avoid inventing them; use neutral language like "undisclosed terms".
+`,
+
+  exit_realisation: `
+- Emphasise what asset or company is being exited, who the buyer is (if known), and how long the asset was held.
+- Focus on value creation, key achievements, and high-level performance, without disclosing confidential numbers unless provided.
+- Highlight continuity for management teams and clients where relevant.
+`,
+
+  portfolio_update: `
+- Focus on operational progress, milestones, and key developments for existing portfolio companies or assets.
+- Group related developments logically (by theme, sector, or geography) to make the update easy to scan.
+- Keep the tone balanced: transparent about challenges, clear on positive progress.
+`,
+
+  default: `
+- Provide balanced, factual context for the situation.
+- Emphasise what is most relevant for an institutional investor trying to understand "what happened" and "why it matters".
+`,
+};
+
 const baseTemplate = `
 Write a {{outputTypeLabel}} for the scenario "{{scenario}}".
 
