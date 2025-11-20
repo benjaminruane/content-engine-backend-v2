@@ -1,12 +1,11 @@
 // api/rewrite.js
 
 import OpenAI from "openai";
-import {
-  PROMPT_RECIPES,
-  SCENARIO_INSTRUCTIONS,
-} from "../helpers/promptRecipes.js";
+import { PROMPT_RECIPES } from "../helpers/promptRecipes.js";
 import { fillTemplate } from "../helpers/template.js";
-import { BASE_STYLE_GUIDE } from "../helpers/styleGuides.js";
+import { DEFAULT_STYLE_GUIDE } from "../helpers/styleGuides.js";
+
+const BASE_STYLE_GUIDE = DEFAULT_STYLE_GUIDE;
 
 const SCENARIO_INSTRUCTIONS = {
   new_investment: `
@@ -43,9 +42,6 @@ Write clear, concise, fact-based commentary aligned with the given scenario.
   `,
 };
 
-
-import { scoreOutput } from "../helpers/scoring.js";
-
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -66,15 +62,24 @@ function setCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
-
 // -----------------------------------------------------------------
 
+// Temporary scoring stub – matches shape expected by the frontend.
+async function scoreOutput() {
+  return {
+    overall: 85,
+    clarity: 0.8,
+    accuracy: 0.75,
+    tone: 0.8,
+    structure: 0.78,
+  };
+}
 
 export default async function handler(req, res) {
   // Set CORS headers on every request
   setCorsHeaders(req, res);
 
-  // Handle preflight OPTIONS request
+  // Handle preflight OPTIONS
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -94,14 +99,9 @@ export default async function handler(req, res) {
       maxTokens = 2048,
       maxWords,
     } = req.body || {};
-    // ...
 
-    if (!text) {
-      return res.status(400).json({ error: "Missing draft text to rewrite" });
-    }
-
-    if (!outputType) {
-      return res.status(400).json({ error: "Missing outputType" });
+    if (!text || !text.trim()) {
+      return res.status(400).json({ error: "Missing text" });
     }
 
     const numericMaxWords =
@@ -109,34 +109,18 @@ export default async function handler(req, res) {
         ? maxWords
         : parseInt(maxWords, 10) || 0;
 
-    const styleGuide = BASE_STYLE_GUIDE;
     const promptPack = PROMPT_RECIPES.generic;
+    const template =
+      promptPack.templates[outputType] ||
+      promptPack.templates.press_release;
 
-    const rewriteTemplate = `
-You are to improve and refine an existing draft of a {{outputTypeLabel}}.
-
-Scenario: {{scenario}}
-
-Rewrite Requirements:
-- Maintain the intent and meaning of the draft.
-- Improve clarity, structure, and tone.
-- Follow the style guide exactly.
-- Respect all user rewrite notes:
-  "{{notes}}"
-
-Here is the draft to rewrite:
-===================
-{{text}}
-===================
-
-Produce a refined, professional version of the draft.
-`;
-
-    const userPromptBase = fillTemplate(rewriteTemplate, {
-      text,
+    // For rewrite, we treat the existing draft as the "source material"
+    // and layer explicit rewrite instructions on top.
+    const baseFilled = fillTemplate(template, {
+      title: "", // we don't track per-version titles yet
       notes,
+      text,      // existing draft text
       scenario,
-      outputTypeLabel: outputType.replace("_", " "),
     });
 
     const scenarioExtra =
@@ -147,15 +131,32 @@ Produce a refined, professional version of the draft.
         ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
         : "";
 
+    const rewriteFrame = `
+You are rewriting an existing draft for the same scenario and output type.
+
+Rewrite the draft text below to:
+- Apply the user's rewrite instructions.
+- Preserve factual content that is supported by the original draft.
+- Improve clarity, tone, and flow while following the STYLE GUIDE.
+- Keep the structure broadly similar unless the instructions request otherwise.
+
+User rewrite instructions (if any):
+${notes || "(none provided)"}
+
+Existing draft to rewrite:
+"""${text}"""
+`;
+
     const userPrompt =
-      userPromptBase +
+      baseFilled +
       "\n\nScenario-specific guidance:\n" +
       scenarioExtra.trim() +
       "\n" +
-      lengthGuidance;
+      lengthGuidance +
+      rewriteFrame;
 
     const systemPrompt =
-      promptPack.systemPrompt + "\n\nSTYLE GUIDE:\n" + styleGuide;
+      promptPack.systemPrompt + "\n\nSTYLE GUIDE:\n" + BASE_STYLE_GUIDE;
 
     const completion = await client.chat.completions.create({
       model: modelId,
@@ -167,19 +168,20 @@ Produce a refined, professional version of the draft.
       ],
     });
 
-    let rewritten =
+    let output =
       completion.choices?.[0]?.message?.content?.trim() ||
       "[No content returned]";
 
+    // Optional hard word cap
     if (numericMaxWords > 0) {
-      const words = rewritten.split(/\s+/);
+      const words = output.split(/\s+/);
       if (words.length > numericMaxWords) {
-        rewritten = words.slice(0, numericMaxWords).join(" ");
+        output = words.slice(0, numericMaxWords).join(" ");
       }
     }
 
     const scoring = await scoreOutput({
-      outputText: rewritten,
+      outputText: output,
       scenario,
       outputType,
     });
@@ -188,7 +190,7 @@ Produce a refined, professional version of the draft.
       outputs: [
         {
           outputType,
-          text: rewritten,
+          text: output,
           score: scoring.overall,
           metrics: {
             clarity: scoring.clarity,
