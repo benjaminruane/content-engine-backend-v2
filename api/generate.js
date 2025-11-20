@@ -11,6 +11,8 @@ import {
   DEFAULT_STYLE_GUIDE,
   SAMPLE_CLIENT_STYLE_GUIDE,
 } from "../helpers/styleGuides.js";
+import { scoreOutput } from "../helpers/scoring.js";
+
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -101,22 +103,30 @@ export default async function handler(req, res) {
       });
 
 
-      const output =
+            const output =
         completion.choices?.[0]?.message?.content?.trim() ||
         "[No content returned]";
 
-      const score = Math.round(Math.random() * 20) + 80;
+      // --- New: score the output using the scoring helper ---
+      const scoring = await scoreOutput({
+        outputText: output,
+        scenario,
+        outputType,
+        workspaceMode,
+      });
 
       outputs.push({
         outputType,
         text: output,
-        score,
+        score: scoring.overall,
         metrics: {
-          clarity: 0.8,
-          accuracy: 0.75,
-          tone: 0.82,
+          clarity: scoring.clarity,
+          accuracy: scoring.accuracy,
+          tone: scoring.tone,
+          structure: scoring.structure,
         },
       });
+
     }
 
     return res.status(200).json({
