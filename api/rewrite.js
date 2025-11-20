@@ -11,6 +11,7 @@ import {
   DEFAULT_STYLE_GUIDE,
   SAMPLE_CLIENT_STYLE_GUIDE,
 } from "../helpers/styleGuides.js";
+import { scoreOutput } from "../helpers/scoring.js";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -118,28 +119,36 @@ Produce a refined, professional version of the draft.
     });
 
 
-    const rewritten =
+        const rewritten =
       completion.choices?.[0]?.message?.content?.trim() ||
       "[No content returned]";
 
-    const score = Math.round(Math.random() * 20) + 80;
+    // --- New: score the rewritten output ---
+    const scoring = await scoreOutput({
+      outputText: rewritten,
+      scenario,
+      outputType,
+      workspaceMode,
+    });
 
     return res.status(200).json({
       outputs: [
         {
           outputType,
           text: rewritten,
-          score,
+          score: scoring.overall,
           metrics: {
-            clarity: 0.8,
-            accuracy: 0.75,
-            tone: 0.82,
+            clarity: scoring.clarity,
+            accuracy: scoring.accuracy,
+            tone: scoring.tone,
+            structure: scoring.structure,
           },
         },
       ],
       workspaceMode,
       scenario,
     });
+
   } catch (err) {
     console.error("Error in /api/rewrite:", err);
     return res.status(500).json({
