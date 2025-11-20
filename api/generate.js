@@ -71,6 +71,18 @@ function setCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
+
+async function scoreOutput() {
+  return {
+    overall: 85,
+    clarity: 0.8,
+    accuracy: 0.75,
+    tone: 0.8,
+    structure: 0.78,
+  };
+}
+
+
 // -----------------------------------------------------------------
 
 export default async function handler(req, res) {
