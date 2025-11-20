@@ -8,9 +8,12 @@ import {
   SAMPLE_CLIENT_STYLE_GUIDE,
 } from "../helpers/styleGuides.js";
 
+const BASE_STYLE_GUIDE = DEFAULT_STYLE_GUIDE;
+
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
 
 // --- CORS helper -------------------------------------------------
 
