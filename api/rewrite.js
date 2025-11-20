@@ -7,6 +7,43 @@ import {
 } from "../helpers/promptRecipes.js";
 import { fillTemplate } from "../helpers/template.js";
 import { BASE_STYLE_GUIDE } from "../helpers/styleGuides.js";
+
+const SCENARIO_INSTRUCTIONS = {
+  new_investment: `
+Treat this as a new direct investment transaction.
+- Focus on describing the company, what it does, and key operational highlights.
+- Explain the investment thesis and why Partners Group was attracted to the opportunity.
+- Mention whether it is a lead, joint, or co-investment if that information is available.
+- Avoid discussing exits or portfolio performance; stay focused on the entry transaction context.
+  `,
+  new_fund_commitment: `
+Treat this as a new commitment to a fund or program.
+- Describe the fund’s strategy, target sectors, and stage.
+- Summarise the rationale for committing to this fund (team, track record, access, differentiation).
+- Keep commentary neutral, factual, and aligned with the STYLE GUIDE.
+  `,
+  exit_realisation: `
+Treat this as a realisation or exit of an existing investment.
+- Describe what happened in the transaction (e.g., full exit, partial sale, recapitalisation).
+- Provide concise context on the asset and holding period if available.
+- Focus on drivers of value creation that are explicitly supported by the source material.
+- Avoid disclosing sensitive or non-public valuation or return metrics.
+  `,
+  revaluation: `
+Treat this as a valuation update for an existing investment.
+- Describe the asset briefly and the key drivers of the valuation movement (if given).
+- Focus on operational or market factors mentioned in the source material.
+- Avoid speculating about performance or outlook beyond the evidence provided.
+  `,
+  default: `
+Write clear, concise, fact-based commentary aligned with the given scenario.
+- Follow the STYLE GUIDE exactly.
+- Keep the tone neutral and professional.
+- Do not invent facts or rationales that are not supported by the source material.
+  `,
+};
+
+
 import { scoreOutput } from "../helpers/scoring.js";
 
 const client = new OpenAI({
@@ -56,7 +93,7 @@ export default async function handler(req, res) {
         : parseInt(maxWords, 10) || 0;
 
     const styleGuide = BASE_STYLE_GUIDE;
-    const promptPack = PROMPT_RECIPES.default;
+    const promptPack = PROMPT_RECIPES.generic;
 
     const rewriteTemplate = `
 You are to improve and refine an existing draft of a {{outputTypeLabel}}.
