@@ -18,12 +18,7 @@ const scoringClient = new OpenAI({
  *   structure: number (0-1)
  * }
  */
-export async function scoreOutput({
-  outputText,
-  scenario,
-  outputType,
-  workspaceMode,
-}) {
+export async function scoreOutput({ outputText, scenario, outputType }) {
   const systemPrompt = `
 You are a strict but fair evaluator of investment-related written content.
 
@@ -50,7 +45,6 @@ Definitions:
   const userPrompt = `
 You are scoring a piece of content generated for the following context:
 
-- Workspace mode: ${workspaceMode}
 - Scenario: ${scenario}
 - Output type: ${outputType}
 
@@ -79,7 +73,6 @@ Return ONLY a JSON object following the schema, with no extra text.
     try {
       parsed = JSON.parse(raw);
     } catch {
-      // Sometimes the model might wrap JSON in backticks; try to clean that
       const cleaned = raw.replace(/```json|```/g, "").trim();
       parsed = JSON.parse(cleaned);
     }
@@ -105,7 +98,6 @@ Return ONLY a JSON object following the schema, with no extra text.
     };
   } catch (err) {
     console.error("Error while scoring output:", err);
-    // Fallback so we never break generation
     return {
       overall: Math.round(Math.random() * 20) + 80,
       clarity: 0.8,
