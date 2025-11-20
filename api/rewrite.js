@@ -5,12 +5,8 @@ import {
   PROMPT_RECIPES,
   SCENARIO_INSTRUCTIONS,
 } from "../helpers/promptRecipes.js";
-
 import { fillTemplate } from "../helpers/template.js";
-import {
-  DEFAULT_STYLE_GUIDE,
-  SAMPLE_CLIENT_STYLE_GUIDE,
-} from "../helpers/styleGuides.js";
+import { BASE_STYLE_GUIDE } from "../helpers/styleGuides.js";
 import { scoreOutput } from "../helpers/scoring.js";
 
 const client = new OpenAI({
@@ -18,7 +14,7 @@ const client = new OpenAI({
 });
 
 export default async function handler(req, res) {
-  // --- CORS headers ---
+  // CORS headers
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader(
     "Access-Control-Allow-Headers",
@@ -36,10 +32,9 @@ export default async function handler(req, res) {
 
   try {
     const {
-      text,                 // the draft to improve
-      notes,                // rewrite instructions
-      outputType,           // "press_release", "linkedin_post", etc.
-      workspaceMode = "generic",
+      text, // draft to rewrite
+      notes, // rewrite instructions
+      outputType,
       scenario = "default",
       modelId = "gpt-4o-mini",
       temperature = 0.3,
@@ -49,27 +44,15 @@ export default async function handler(req, res) {
     if (!text) {
       return res.status(400).json({ error: "Missing draft text to rewrite" });
     }
+
     if (!outputType) {
       return res.status(400).json({ error: "Missing outputType" });
     }
 
-    // Pick style guide
-    const styleGuide =
-      workspaceMode === "client"
-        ? SAMPLE_CLIENT_STYLE_GUIDE
-        : DEFAULT_STYLE_GUIDE;
+    const styleGuide = BASE_STYLE_GUIDE;
+    const promptPack = PROMPT_RECIPES.default;
 
-    // Pick template pack (generic or client)
-    const pack =
-      PROMPT_RECIPES[workspaceMode] || PROMPT_RECIPES.generic;
-
-    // Pick the generation template for this type
-    const originalTemplate =
-      pack.templates[outputType] ||
-      pack.templates.press_release;
-
-    // Turn the generation template into a rewrite template
-        const rewriteTemplate = `
+    const rewriteTemplate = `
 You are to improve and refine an existing draft of a {{outputTypeLabel}}.
 
 Scenario: {{scenario}}
@@ -106,7 +89,7 @@ Produce a refined, professional version of the draft.
       "\n";
 
     const systemPrompt =
-      pack.systemPrompt + "\n\nSTYLE GUIDE:\n" + styleGuide;
+      promptPack.systemPrompt + "\n\nSTYLE GUIDE:\n" + styleGuide;
 
     const completion = await client.chat.completions.create({
       model: modelId,
@@ -118,17 +101,14 @@ Produce a refined, professional version of the draft.
       ],
     });
 
-
-        const rewritten =
+    const rewritten =
       completion.choices?.[0]?.message?.content?.trim() ||
       "[No content returned]";
 
-    // --- New: score the rewritten output ---
     const scoring = await scoreOutput({
       outputText: rewritten,
       scenario,
       outputType,
-      workspaceMode,
     });
 
     return res.status(200).json({
@@ -145,10 +125,8 @@ Produce a refined, professional version of the draft.
           },
         },
       ],
-      workspaceMode,
       scenario,
     });
-
   } catch (err) {
     console.error("Error in /api/rewrite:", err);
     return res.status(500).json({
