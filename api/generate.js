@@ -1,27 +1,40 @@
 // api/generate.js
 
 import OpenAI from "openai";
-import {
-  PROMPT_RECIPES,
-  SCENARIO_INSTRUCTIONS,
-} from "../helpers/promptRecipes.js";
+import { PROMPT_RECIPES } from "../helpers/promptRecipes.js";
 import { fillTemplate } from "../helpers/template.js";
-import { BASE_STYLE_GUIDE } from "../helpers/styleGuides.js";
-import { scoreOutput } from "../helpers/scoring.js";
+import {
+  DEFAULT_STYLE_GUIDE,
+  SAMPLE_CLIENT_STYLE_GUIDE,
+} from "../helpers/styleGuides.js";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+// --- CORS helper -------------------------------------------------
 
+const ALLOWED_ORIGINS = [
+  "https://content-engine-frontend-gilt.vercel.app",
+  "http://localhost:3000",
+];
+
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+  }
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+// -----------------------------------------------------------------
+
+export default async function handler(req, res) {
+  // Set CORS headers on every request
+  setCorsHeaders(req, res);
+
+  // Handle preflight OPTIONS request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -36,12 +49,13 @@ export default async function handler(req, res) {
       notes,
       text,
       selectedTypes = [],
+      workspaceMode = "generic",
       scenario = "default",
       modelId = "gpt-4o-mini",
       temperature = 0.3,
       maxTokens = 2048,
-      maxWords,
     } = req.body || {};
+
 
     if (!text) {
       return res.status(400).json({ error: "Missing text" });
