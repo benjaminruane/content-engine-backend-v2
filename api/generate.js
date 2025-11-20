@@ -45,16 +45,18 @@ export default async function handler(req, res) {
 
   try {
     const {
-      title,
-      notes,
-      text,
-      selectedTypes = [],
-      workspaceMode = "generic",
-      scenario = "default",
-      modelId = "gpt-4o-mini",
-      temperature = 0.3,
-      maxTokens = 2048,
-    } = req.body || {};
+  title,
+  notes,
+  text,
+  selectedTypes = [],
+  workspaceMode = "generic",
+  scenario = "default",
+  modelId = "gpt-4o-mini",
+  temperature = 0.3,
+  maxTokens = 2048,
+  maxWords, // optional soft word limit from the frontend
+} = req.body || {};
+
 
 
     if (!text) {
