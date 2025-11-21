@@ -3,10 +3,7 @@
 import OpenAI from "openai";
 import { PROMPT_RECIPES } from "../helpers/promptRecipes.js";
 import { fillTemplate } from "../helpers/template.js";
-import {
-  DEFAULT_STYLE_GUIDE,
-  SAMPLE_CLIENT_STYLE_GUIDE,
-} from "../helpers/styleGuides.js";
+import { DEFAULT_STYLE_GUIDE } from "../helpers/styleGuides.js";
 
 const BASE_STYLE_GUIDE = DEFAULT_STYLE_GUIDE;
 
@@ -18,14 +15,12 @@ Treat this as a new direct investment transaction.
 - Mention whether it is a lead, joint, or co-investment if that information is available.
 - Avoid discussing exits or portfolio performance; stay focused on the entry transaction context.
   `,
-
   new_fund_commitment: `
 Treat this as a new commitment to a fund or program.
 - Describe the fund’s strategy, target sectors, and stage.
 - Summarise the rationale for committing to this fund (team, track record, access, differentiation).
 - Keep commentary neutral, factual, and aligned with the STYLE GUIDE.
   `,
-
   exit_realisation: `
 Treat this as a realisation or exit of an existing investment.
 - Describe what happened in the transaction (e.g., full exit, partial sale, recapitalisation).
@@ -33,14 +28,12 @@ Treat this as a realisation or exit of an existing investment.
 - Focus on drivers of value creation that are explicitly supported by the source material.
 - Avoid disclosing sensitive or non-public valuation or return metrics.
   `,
-
   revaluation: `
 Treat this as a valuation update for an existing investment.
 - Describe the asset briefly and the key drivers of the valuation movement (if given).
 - Focus on operational or market factors mentioned in the source material.
 - Avoid speculating about performance or outlook beyond the evidence provided.
   `,
-
   default: `
 Write clear, concise, fact-based commentary aligned with the given scenario.
 - Follow the STYLE GUIDE exactly.
@@ -49,11 +42,9 @@ Write clear, concise, fact-based commentary aligned with the given scenario.
   `,
 };
 
-
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
-
 
 // --- CORS helper -------------------------------------------------
 
@@ -71,7 +62,9 @@ function setCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
+// -----------------------------------------------------------------
 
+// Prototype scoring stub – replace later with real rubric-based scoring.
 async function scoreOutput() {
   return {
     overall: 85,
@@ -82,8 +75,37 @@ async function scoreOutput() {
   };
 }
 
+function normalizeCurrencies(text) {
+  if (!text) return text;
+  return text
+    .replace(/\$([0-9])/g, "USD $1")
+    .replace(/€([0-9])/g, "EUR $1")
+    .replace(/£([0-9])/g, "GBP $1");
+}
 
-// -----------------------------------------------------------------
+function enforceWordLimit(text, maxWords) {
+  if (!maxWords || maxWords <= 0 || !text) return text;
+
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+
+  // Try to trim at sentence boundaries first
+  const sentences = text.match(/[^.!?]+[.!?]+/g);
+  if (!sentences) {
+    return words.slice(0, maxWords).join(" ");
+  }
+
+  let rebuilt = "";
+  for (const s of sentences) {
+    const countSoFar = rebuilt.split(/\s+/).filter(Boolean).length;
+    const sentenceCount = s.split(/\s+/).filter(Boolean).length;
+    if (countSoFar + sentenceCount > maxWords) break;
+    rebuilt += s.trim() + " ";
+  }
+
+  const trimmed = rebuilt.trim();
+  return trimmed || words.slice(0, maxWords).join(" ");
+}
 
 export default async function handler(req, res) {
   // Set CORS headers on every request
@@ -100,19 +122,16 @@ export default async function handler(req, res) {
 
   try {
     const {
-  title,
-  notes,
-  text,
-  selectedTypes = [],
-  workspaceMode = "generic",
-  scenario = "default",
-  modelId = "gpt-4o-mini",
-  temperature = 0.3,
-  maxTokens = 2048,
-  maxWords, // optional soft word limit from the frontend
-} = req.body || {};
-
-
+      title,
+      notes,
+      text,
+      selectedTypes = [],
+      scenario = "default",
+      modelId = "gpt-4o-mini",
+      temperature = 0.3,
+      maxTokens = 2048,
+      maxWords, // optional soft word limit from the frontend (string or number)
+    } = req.body || {};
 
     if (!text) {
       return res.status(400).json({ error: "Missing text" });
@@ -125,11 +144,12 @@ export default async function handler(req, res) {
     const numericMaxWords =
       typeof maxWords === "number"
         ? maxWords
-        : parseInt(maxWords, 10) || 0;
+        : maxWords
+        ? parseInt(maxWords, 10) || 0
+        : 0;
 
     const styleGuide = BASE_STYLE_GUIDE;
-const promptPack = PROMPT_RECIPES.generic;
-
+    const promptPack = PROMPT_RECIPES.generic;
 
     const outputs = [];
 
@@ -161,14 +181,12 @@ const promptPack = PROMPT_RECIPES.generic;
         lengthGuidance;
 
       const systemPrompt =
-  promptPack.systemPrompt +
-  "\n\nYou must follow the STYLE GUIDE strictly. " +
-  "If the source uses symbols (e.g., $, €, £), rewrite them into the proper currency code " +
-  "(e.g., USD, EUR, GBP). " +
-  "Apply ALL formatting rules consistently, even when the source does not." +
-  "\n\nSTYLE GUIDE:\n" +
-  styleGuide;
-
+        promptPack.systemPrompt +
+        "\n\nYou must follow the STYLE GUIDE strictly. " +
+        "If the source uses currency symbols (e.g. $, €, £), rewrite them using the correct three-letter currency code " +
+        "(e.g. USD, EUR, GBP). Apply ALL formatting rules from the STYLE GUIDE consistently, even when the source does not." +
+        "\n\nSTYLE GUIDE:\n" +
+        styleGuide;
 
       const completion = await client.chat.completions.create({
         model: modelId,
@@ -181,41 +199,12 @@ const promptPack = PROMPT_RECIPES.generic;
       });
 
       let output =
-  normalizeCurrencies(
-    completion.choices?.[0]?.message?.content?.trim() || "[No content returned]"
-  );
+        completion.choices?.[0]?.message?.content?.trim() ||
+        "[No content returned]";
 
-      function enforceWordLimit(text, maxWords) {
-  if (!maxWords || maxWords <= 0) return text;
-
-  const words = text.split(/\s+/);
-  if (words.length <= maxWords) return text;
-
-  // Soft limit: keep only complete sentences
-  const sentences = text.match(/[^.!?]+[.!?]+/g);
-  if (!sentences) return words.slice(0, maxWords).join(" ");
-
-  let rebuilt = "";
-  for (const s of sentences) {
-    const wCount = rebuilt.split(/\s+/).filter(Boolean).length;
-    if (wCount + s.split(/\s+/).length > maxWords) break;
-    rebuilt += s.trim() + " ";
-  }
-
-  return rebuilt.trim() || words.slice(0, maxWords).join(" ");
-}
-
-// Optional hard word cap
-output = enforceWordLimit(output, numericMaxWords);
-
-
-      function normalizeCurrencies(text) {
-  return text
-    .replace(/\$([0-9])/g, "USD $1")
-    .replace(/€([0-9])/g, "EUR $1")
-    .replace(/£([0-9])/g, "GBP $1");
-}
-
+      // Normalize style-related details and apply a softer word cap
+      output = normalizeCurrencies(output);
+      output = enforceWordLimit(output, numericMaxWords);
 
       const scoring = await scoreOutput({
         outputText: output,
