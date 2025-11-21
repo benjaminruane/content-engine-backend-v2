@@ -156,7 +156,13 @@ Existing draft to rewrite:
       rewriteFrame;
 
     const systemPrompt =
-      promptPack.systemPrompt + "\n\nSTYLE GUIDE:\n" + BASE_STYLE_GUIDE;
+  promptPack.systemPrompt +
+  "\n\nYou must follow the STYLE GUIDE strictly. " +
+  "If the source uses symbols (e.g., $, €, £), rewrite them into the proper currency code " +
+  "(e.g., USD, EUR, GBP). " +
+  "Apply ALL formatting rules consistently, even when the source does not." +
+  "\n\nSTYLE GUIDE:\n" +
+  styleGuide;
 
     const completion = await client.chat.completions.create({
       model: modelId,
@@ -169,16 +175,41 @@ Existing draft to rewrite:
     });
 
     let output =
-      completion.choices?.[0]?.message?.content?.trim() ||
-      "[No content returned]";
+  normalizeCurrencies(
+    completion.choices?.[0]?.message?.content?.trim() || "[No content returned]"
+  );
 
-    // Optional hard word cap
-    if (numericMaxWords > 0) {
-      const words = output.split(/\s+/);
-      if (words.length > numericMaxWords) {
-        output = words.slice(0, numericMaxWords).join(" ");
-      }
-    }
+    function enforceWordLimit(text, maxWords) {
+  if (!maxWords || maxWords <= 0) return text;
+
+  const words = text.split(/\s+/);
+  if (words.length <= maxWords) return text;
+
+  // Soft limit: keep only complete sentences
+  const sentences = text.match(/[^.!?]+[.!?]+/g);
+  if (!sentences) return words.slice(0, maxWords).join(" ");
+
+  let rebuilt = "";
+  for (const s of sentences) {
+    const wCount = rebuilt.split(/\s+/).filter(Boolean).length;
+    if (wCount + s.split(/\s+/).length > maxWords) break;
+    rebuilt += s.trim() + " ";
+  }
+
+  return rebuilt.trim() || words.slice(0, maxWords).join(" ");
+}
+
+
+// Optional hard word cap
+output = enforceWordLimit(output, numericMaxWords);
+
+
+    function normalizeCurrencies(text) {
+  return text
+    .replace(/\$([0-9])/g, "USD $1")
+    .replace(/€([0-9])/g, "EUR $1")
+    .replace(/£([0-9])/g, "GBP $1");
+}
 
     const scoring = await scoreOutput({
       outputText: output,
