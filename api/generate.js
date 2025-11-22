@@ -241,7 +241,7 @@ This is a COMPLETE / INTERNAL version:
           { role: "user", content: userPrompt },
         ],
       });
-
+ 
       let output =
         completion.choices?.[0]?.message?.content?.trim() ||
         "[No content returned]";
