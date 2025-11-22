@@ -10,7 +10,7 @@ import {
 
 const BASE_STYLE_GUIDE = DEFAULT_STYLE_GUIDE;
 
-// Scenario-specific nudges
+// Scenario-specific extra guidance
 const SCENARIO_INSTRUCTIONS = {
   new_investment: `
 Treat this as a new direct investment transaction.
@@ -40,20 +40,6 @@ Treat this as a valuation update for an existing investment.
 - Describe the asset briefly and the key drivers of the valuation movement (if given).
 - Focus on operational or market factors mentioned in the source material.
 - Avoid speculating about performance or outlook beyond the evidence provided.
-  `,
-
-  fund_capital_call: `
-Treat this as a fund capital call.
-- Emphasise the largest or most important use of proceeds.
-- Clearly explain what the capital is being used for (e.g., specific acquisition, follow-on investment, fees).
-- Keep the description concise and aligned with the STYLE GUIDE.
-  `,
-
-  fund_distribution: `
-Treat this as a fund distribution / proceeds to investors.
-- Emphasise the largest source of funds giving rise to the distribution.
-- If there are multiple realisations, highlight the main one and qualify with "among others" where appropriate.
-- Provide a brief description of the realised asset(s) and value-creation themes, if supported by the source material.
   `,
 
   default: `
@@ -86,7 +72,7 @@ function setCorsHeaders(req, res) {
 }
 // -----------------------------------------------------------------
 
-// Temporary scoring stub – matches the shape expected by the frontend.
+// Simple scoring stub so the frontend has something to display
 async function scoreOutput() {
   return {
     overall: 85,
@@ -97,7 +83,7 @@ async function scoreOutput() {
   };
 }
 
-// Normalise currency symbols to codes
+// Normalise currency symbols → codes (basic pass)
 function normalizeCurrencies(text) {
   return text
     .replace(/\$([0-9])/g, "USD $1")
@@ -105,7 +91,7 @@ function normalizeCurrencies(text) {
     .replace(/£([0-9])/g, "GBP $1");
 }
 
-// Soft word-limit: prefer whole sentences, then hard cap as fallback
+// Soft word limit that keeps whole sentences where possible
 function enforceWordLimit(text, maxWords) {
   if (!maxWords || maxWords <= 0) return text;
 
@@ -113,9 +99,7 @@ function enforceWordLimit(text, maxWords) {
   if (words.length <= maxWords) return text;
 
   const sentences = text.match(/[^.!?]+[.!?]+/g);
-  if (!sentences) {
-    return words.slice(0, maxWords).join(" ");
-  }
+  if (!sentences) return words.slice(0, maxWords).join(" ");
 
   let rebuilt = "";
   for (const s of sentences) {
@@ -125,15 +109,14 @@ function enforceWordLimit(text, maxWords) {
     rebuilt += s.trim() + " ";
   }
 
-  const trimmed = rebuilt.trim();
-  return trimmed || words.slice(0, maxWords).join(" ");
+  return rebuilt.trim() || words.slice(0, maxWords).join(" ");
 }
 
 export default async function handler(req, res) {
-  // CORS on every request
+  // Set CORS headers on every request
   setCorsHeaders(req, res);
 
-  // Preflight
+  // Handle preflight OPTIONS request
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -148,13 +131,14 @@ export default async function handler(req, res) {
       notes,
       text,
       selectedTypes = [],
-      workspaceMode = "generic", // kept for future multi-workspace support
+      workspaceMode = "generic", // reserved for later multi-client support
       scenario = "default",
-      versionType = "complete",   // "complete" | "public"
+      versionType = "complete", // "complete" | "public"
       modelId = "gpt-4o-mini",
       temperature = 0.3,
       maxTokens = 2048,
-      maxWords, // optional soft word limit
+      maxWords, // optional soft word limit from the frontend
+      publicSearch, // currently unused but kept for future roadmap
     } = req.body || {};
 
     if (!text) {
@@ -166,9 +150,7 @@ export default async function handler(req, res) {
     }
 
     const numericMaxWords =
-      typeof maxWords === "number"
-        ? maxWords
-        : parseInt(maxWords, 10) || 0;
+      typeof maxWords === "number" ? maxWords : parseInt(maxWords, 10) || 0;
 
     const styleGuide = BASE_STYLE_GUIDE;
     const promptPack = PROMPT_RECIPES.generic;
@@ -177,15 +159,13 @@ export default async function handler(req, res) {
 
     for (const outputType of selectedTypes) {
       const template =
-        promptPack.templates[outputType] ||
-        promptPack.templates.press_release;
+        promptPack.templates[outputType] || promptPack.templates.press_release;
 
       const userPromptBase = fillTemplate(template, {
         title,
         notes,
         text,
         scenario,
-        versionType,
       });
 
       const scenarioExtra =
@@ -196,10 +176,27 @@ export default async function handler(req, res) {
           ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
           : "";
 
+      // Version-specific guidance (Complete vs Public)
+      const versionGuidance =
+        versionType === "public"
+          ? `
+Public-facing version guidance:
+- Base the draft primarily on information that is clearly public (e.g. official press releases, company websites, widely reported facts).
+- If a fact appears only in internal material, you may include it if it is clearly non-sensitive and high-level, but avoid anything granular, proprietary, or commercially delicate.
+- Prefer qualitative or approximate wording over precise internal figures where there is any doubt.
+- When in doubt, favour brevity and high-level descriptions over detail.`
+          : `
+Internal "complete" version guidance:
+- You may rely fully on the internal source documents.
+- It is acceptable to include internal figures and detail, provided they are aligned with the WRITING GUIDELINES and not unnecessarily sensitive.
+- Write for a sophisticated, client-facing internal audience and prioritise clarity and completeness over brevity.`;
+
       const userPrompt =
         userPromptBase +
         "\n\nScenario-specific guidance:\n" +
         scenarioExtra.trim() +
+        "\n" +
+        versionGuidance +
         "\n" +
         lengthGuidance;
 
@@ -208,8 +205,10 @@ export default async function handler(req, res) {
         "\n\nYou must follow the STYLE GUIDE strictly. " +
         "If the source uses symbols (e.g., $, €, £), rewrite them into the proper currency code " +
         "(e.g., USD, EUR, GBP). " +
-        "Apply ALL formatting rules consistently, even when the source does not." +
-        "\n\nSTYLE GUIDE:\n" +
+        "Apply ALL formatting rules consistently, even when the source does not.\n" +
+        "Numbers from one to eleven should usually be spelled out; use numerals for twelve and above, " +
+        "unless doing so would clearly reduce clarity in a technical context.\n\n" +
+        "STYLE GUIDE:\n" +
         styleGuide;
 
       const completion = await client.chat.completions.create({
@@ -226,7 +225,7 @@ export default async function handler(req, res) {
         completion.choices?.[0]?.message?.content?.trim() ||
         "[No content returned]";
 
-      // Normalise currencies then enforce word limit
+      // Style clean-up passes
       output = normalizeCurrencies(output);
       output = enforceWordLimit(output, numericMaxWords);
 
