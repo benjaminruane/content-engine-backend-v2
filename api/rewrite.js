@@ -34,18 +34,6 @@ Treat this as a valuation update for an existing investment.
 - Focus on operational or market factors mentioned in the source material.
 - Avoid speculating about performance or outlook beyond the evidence provided.
   `,
-  fund_capital_call: `
-Treat this as a fund capital call.
-- Emphasise the largest or most important use of proceeds.
-- Clearly explain what the capital is being used for (e.g., specific acquisition, follow-on investment, fees).
-- Keep the description concise and aligned with the STYLE GUIDE.
-  `,
-  fund_distribution: `
-Treat this as a fund distribution / proceeds to investors.
-- Emphasise the largest source of funds giving rise to the distribution.
-- If there are multiple realisations, highlight the main one and qualify with "among others" where appropriate.
-- Provide a brief description of the realised asset(s) and value-creation themes, if supported by the source material.
-  `,
   default: `
 Write clear, concise, fact-based commentary aligned with the given scenario.
 - Follow the STYLE GUIDE exactly.
@@ -87,7 +75,7 @@ async function scoreOutput() {
   };
 }
 
-// Normalise currency symbols to codes
+// Normalise currency symbols → codes (basic pass)
 function normalizeCurrencies(text) {
   return text
     .replace(/\$([0-9])/g, "USD $1")
@@ -95,7 +83,7 @@ function normalizeCurrencies(text) {
     .replace(/£([0-9])/g, "GBP $1");
 }
 
-// Soft word-limit: prefer whole sentences, then hard cap as fallback
+// Soft word limit that keeps whole sentences where possible
 function enforceWordLimit(text, maxWords) {
   if (!maxWords || maxWords <= 0) return text;
 
@@ -103,9 +91,7 @@ function enforceWordLimit(text, maxWords) {
   if (words.length <= maxWords) return text;
 
   const sentences = text.match(/[^.!?]+[.!?]+/g);
-  if (!sentences) {
-    return words.slice(0, maxWords).join(" ");
-  }
+  if (!sentences) return words.slice(0, maxWords).join(" ");
 
   let rebuilt = "";
   for (const s of sentences) {
@@ -115,8 +101,7 @@ function enforceWordLimit(text, maxWords) {
     rebuilt += s.trim() + " ";
   }
 
-  const trimmed = rebuilt.trim();
-  return trimmed || words.slice(0, maxWords).join(" ");
+  return rebuilt.trim() || words.slice(0, maxWords).join(" ");
 }
 
 export default async function handler(req, res) {
@@ -150,24 +135,19 @@ export default async function handler(req, res) {
     }
 
     const numericMaxWords =
-      typeof maxWords === "number"
-        ? maxWords
-        : parseInt(maxWords, 10) || 0;
+      typeof maxWords === "number" ? maxWords : parseInt(maxWords, 10) || 0;
 
     const promptPack = PROMPT_RECIPES.generic;
     const template =
-      promptPack.templates[outputType] ||
-      promptPack.templates.press_release;
+      promptPack.templates[outputType] || promptPack.templates.press_release;
 
     const styleGuide = BASE_STYLE_GUIDE;
 
-    // For rewrite, we treat the existing draft as the "source material"
     const baseFilled = fillTemplate(template, {
-      title: "", // per-version titles not tracked yet
+      title: "",
       notes,
-      text,      // existing draft text
+      text, // existing draft text
       scenario,
-      versionType,
     });
 
     const scenarioExtra =
@@ -177,6 +157,18 @@ export default async function handler(req, res) {
       numericMaxWords > 0
         ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
         : "";
+
+    const versionGuidance =
+      versionType === "public"
+        ? `
+Public-facing version guidance:
+- Treat this as a public summary. Prefer information that is clearly public.
+- If some details in the existing draft look internal or sensitive, you may soften or omit them.
+- Favour high-level, qualitative wording and avoid granular internal metrics where there is any doubt.`
+        : `
+Internal "complete" version guidance:
+- You may preserve or enhance internal detail where it helps clarity.
+- Keep everything aligned with the WRITING GUIDELINES and a professional, client-facing tone.`;
 
     const rewriteFrame = `
 You are rewriting an existing draft for the same scenario and output type.
@@ -199,16 +191,20 @@ Existing draft to rewrite:
       "\n\nScenario-specific guidance:\n" +
       scenarioExtra.trim() +
       "\n" +
+      versionGuidance +
+      "\n" +
       lengthGuidance +
       rewriteFrame;
 
     const systemPrompt =
       promptPack.systemPrompt +
       "\n\nYou must follow the STYLE GUIDE strictly. " +
-      "If the source uses symbols (e.g., $, €, £), rewrite them into the proper currency code " +
+      "If the text uses symbols (e.g., $, €, £), rewrite them into the proper currency code " +
       "(e.g., USD, EUR, GBP). " +
-      "Apply ALL formatting rules consistently, even when the source does not." +
-      "\n\nSTYLE GUIDE:\n" +
+      "Apply ALL formatting rules consistently, even when they were not followed in the original draft.\n" +
+      "Numbers from one to eleven should usually be spelled out; use numerals for twelve and above, " +
+      "unless doing so would clearly reduce clarity in a technical context.\n\n" +
+      "STYLE GUIDE:\n" +
       styleGuide;
 
     const completion = await client.chat.completions.create({
