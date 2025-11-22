@@ -15,37 +15,12 @@ Treat this as a new direct investment transaction.
 - Mention whether it is a lead, joint, or co-investment if that information is available.
 - Avoid discussing exits or portfolio performance; stay focused on the entry transaction context.
   `,
-    new_fund_commitment: `
-Treat this as a new commitment by Partners Group to a private markets fund or program.
-
-COMPLETE VERSION (internal / investor commentary):
-- Aim for around 150 words, in two paragraphs:
-  - Paragraph 1: describe the fund
-  - Paragraph 2: explain the investment merits and why Partners Group was attracted to it.
-- Start with a formulation similar to:
-  "In TRANSACTION DATE, Partners Group committed to INVESTMENT, a ..."
-- Where the information is available in the source material, include:
-  - A clear description of the fund and its target size.
-  - The fund's investment strategy and whether this is a new strategy or a continuation of an existing strategy.
-  - How many underlying investments the fund plans to make.
-  - Key sectors the fund targets.
-  - Typical target equity or enterprise value range for each deal.
-  - The manager's value creation approach, described both thematically and structurally
-    (for example: "digital transformation" and "Portfolio Support Group").
-  - The main investment merits, grouped into themes such as track record, entry valuation and operating team.
-  - Why Partners Group was attracted to the commitment, using a narrative tone that remains factual and neutral.
-  - If the fund has already started investing or has seed assets, briefly mention these
-    (e.g. asset name and one-line description) only where supported by the sources.
-- Do not introduce fund terms such as fee levels, carry rates, hurdle rates or GP commitments unless they are clearly
-  and publicly disclosed.
-- Do not invent numerical details (target size, number of investments, valuation ranges, etc.) that are not supported
-  by the source material.
-
-GENERAL:
-- Keep tone factual, concise and professional.
-- Follow the STYLE GUIDE strictly for language, number formatting and terminology.
-`,
-
+  new_fund_commitment: `
+Treat this as a new commitment to a fund or program.
+- Describe the fund’s strategy, target sectors, and stage.
+- Summarise the rationale for committing to this fund (team, track record, access, differentiation).
+- Keep commentary neutral, factual, and aligned with the STYLE GUIDE.
+  `,
   exit_realisation: `
 Treat this as a realisation or exit of an existing investment.
 - Describe what happened in the transaction (e.g., full exit, partial sale, recapitalisation).
@@ -59,89 +34,23 @@ Treat this as a valuation update for an existing investment.
 - Focus on operational or market factors mentioned in the source material.
 - Avoid speculating about performance or outlook beyond the evidence provided.
   `,
-
-    fund_distribution: `
-Treat this as a distribution or exit event at fund level, where a fund returns proceeds to investors.
-
-COMPLETE VERSION (internal / investor commentary):
-- Aim for around 140 words in a single paragraph.
-- Focus on the largest component of the distribution, while acknowledging there may be multiple sources.
-- Use a formulation similar to:
-  "In TRANSACTION DATE, INVESTMENT distributed proceeds from ..."
-- Where supported by the sources, include:
-  - The source of the distribution: what was realised or sold, when it occurred and how
-    (for example, full exit, partial sale, recapitalisation or refinancing).
-  - A concise description of the asset or assets sold or realised (or partially realised).
-  - Returns on the investment, if known and clearly supported by the source documents
-    (for example, high-level multiple or performance indicators), keeping in mind sensitivity.
-  - Key transformation or value-creation actions implemented since the original investment
-    (for example, operational improvements, add-on acquisitions, strategic repositioning), only where explicitly supported.
-- If there are multiple sources of distribution, focus on the largest and qualify this with
-  wording such as "among others" to signal that there were additional smaller contributors.
-- Avoid disclosing sensitive or non-public valuation or return metrics; keep performance commentary high-level and
-  consistent with the STYLE GUIDE and source materials.
-
-GENERAL:
-- Keep tone factual, concise and neutral.
-- Follow the STYLE GUIDE strictly, including number formatting and avoidance of speculative language.
-`,
-
-    fund_capital_call: `
-Treat this as a capital call by a fund, focusing on the main use of proceeds.
-
-COMPLETE VERSION (internal / investor commentary):
-- Aim for around 140 words in a single paragraph.
-- Focus on the largest use of funds that gave rise to the capital call, while acknowledging there may be other uses.
-- Use a formulation similar to:
-  "In TRANSACTION DATE, INVESTMENT called capital for ..."
-- Where supported by the sources, include:
-  - The primary purpose of the capital call (for example, funding a new investment, follow-on capital,
-    fees and expenses or other specific uses).
-  - A concise description of the asset acquired or financed and the transaction (what was acquired, when and how).
-  - Any headline valuation metric for the underlying transaction (for example, enterprise value)
-    only if explicitly provided in the source material.
-  - A clear investment thesis: why this use of capital is attractive or strategic for the fund.
-  - A brief value-creation plan (for example, operational improvements, organic growth, M&A),
-    described thematically and only where supported by the sources.
-  - Any latest developments or early results that are clearly value-adding and safe to mention.
-- If there are multiple uses of the called capital, describe the largest explicitly and qualify this with
-  wording such as "among others" to signal that other uses exist.
-- Avoid disclosing sensitive or non-public financial terms beyond what is clearly stated in the sources.
-
-GENERAL:
-- Keep tone factual, concise and professional.
-- Follow the STYLE GUIDE strictly, including number handling and terminology.
-`,
-
-  
+  fund_capital_call: `
+Treat this as a fund capital call.
+- Emphasise the largest or most important use of proceeds.
+- Clearly explain what the capital is being used for (e.g., specific acquisition, follow-on investment, fees).
+- Keep the description concise and aligned with the STYLE GUIDE.
+  `,
+  fund_distribution: `
+Treat this as a fund distribution / proceeds to investors.
+- Emphasise the largest source of funds giving rise to the distribution.
+- If there are multiple realisations, highlight the main one and qualify with "among others" where appropriate.
+- Provide a brief description of the realised asset(s) and value-creation themes, if supported by the source material.
+  `,
   default: `
 Write clear, concise, fact-based commentary aligned with the given scenario.
 - Follow the STYLE GUIDE exactly.
 - Keep the tone neutral and professional.
 - Do not invent facts or rationales that are not supported by the source material.
-  `,
-};
-
-const VERSION_INSTRUCTIONS = {
-  complete: `
-Treat this as an internal, complete version.
-
-- You may keep all factual content from the draft where it is consistent with the sources.
-- You may include non-public details where they are relevant and not obviously sensitive,
-  but still avoid anything that looks like detailed deal terms or confidential fund economics.
-- Focus on improving clarity, flow and adherence to the WRITING GUIDELINES.
-  `,
-
-  public: `
-Treat this as an external, public-facing version.
-
-- Prefer information that is clearly public or clearly not sensitive.
-- Generalise or omit obviously sensitive elements such as detailed transaction terms,
-  non-public valuation or performance metrics, and fund economics.
-- You may keep neutral descriptive statements that are not obviously confidential,
-  even if they come from internal sources.
-- When in doubt, bias toward caution and higher-level wording.
-- Ensure the rewritten draft still follows the WRITING GUIDELINES and remains coherent.
   `,
 };
 
@@ -167,7 +76,7 @@ function setCorsHeaders(req, res) {
 }
 // -----------------------------------------------------------------
 
-// Prototype scoring stub – same as generate.js
+// Temporary scoring stub – matches shape expected by the frontend.
 async function scoreOutput() {
   return {
     overall: 85,
@@ -178,29 +87,31 @@ async function scoreOutput() {
   };
 }
 
+// Normalise currency symbols to codes
 function normalizeCurrencies(text) {
-  if (!text) return text;
   return text
     .replace(/\$([0-9])/g, "USD $1")
     .replace(/€([0-9])/g, "EUR $1")
     .replace(/£([0-9])/g, "GBP $1");
 }
 
+// Soft word-limit: prefer whole sentences, then hard cap as fallback
 function enforceWordLimit(text, maxWords) {
-  if (!maxWords || maxWords <= 0 || !text) return text;
+  if (!maxWords || maxWords <= 0) return text;
 
   const words = text.split(/\s+/);
   if (words.length <= maxWords) return text;
 
-  // Prefer trimming at sentence boundaries
   const sentences = text.match(/[^.!?]+[.!?]+/g);
-  if (!sentences) return words.slice(0, maxWords).join(" ");
+  if (!sentences) {
+    return words.slice(0, maxWords).join(" ");
+  }
 
   let rebuilt = "";
   for (const s of sentences) {
-    const countSoFar = rebuilt.split(/\s+/).filter(Boolean).length;
-    const sentenceCount = s.split(/\s+/).filter(Boolean).length;
-    if (countSoFar + sentenceCount > maxWords) break;
+    const currentCount = rebuilt.split(/\s+/).filter(Boolean).length;
+    const sentenceWords = s.split(/\s+/).length;
+    if (currentCount + sentenceWords > maxWords) break;
     rebuilt += s.trim() + " ";
   }
 
@@ -209,26 +120,30 @@ function enforceWordLimit(text, maxWords) {
 }
 
 export default async function handler(req, res) {
-  // Set CORS headers
+  // Set CORS headers on every request
   setCorsHeaders(req, res);
 
-  if (req.method === "OPTIONS") return res.status(200).end();
+  // Handle preflight OPTIONS
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
   try {
-const {
-  text,
-  notes,
-  outputType = "transaction_text",
-  scenario = "default",
-  versionType = "complete",
-  modelId = "gpt-4o-mini",
-  temperature = 0.3,
-  maxTokens = 2048,
-  maxWords,
-} = req.body || {};
+    const {
+      text,
+      notes,
+      outputType = "transaction_text",
+      scenario = "default",
+      versionType = "complete", // "complete" | "public"
+      modelId = "gpt-4o-mini",
+      temperature = 0.3,
+      maxTokens = 2048,
+      maxWords,
+    } = req.body || {};
 
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "Missing text" });
@@ -237,41 +152,38 @@ const {
     const numericMaxWords =
       typeof maxWords === "number"
         ? maxWords
-        : maxWords
-        ? parseInt(maxWords, 10) || 0
-        : 0;
+        : parseInt(maxWords, 10) || 0;
 
     const promptPack = PROMPT_RECIPES.generic;
-
     const template =
       promptPack.templates[outputType] ||
       promptPack.templates.press_release;
 
-    // Use the existing draft as the source material during rewrite
+    const styleGuide = BASE_STYLE_GUIDE;
+
+    // For rewrite, we treat the existing draft as the "source material"
     const baseFilled = fillTemplate(template, {
-      title: "",
+      title: "", // per-version titles not tracked yet
       notes,
-      text,
+      text,      // existing draft text
       scenario,
+      versionType,
     });
 
-const scenarioExtra =
-  SCENARIO_INSTRUCTIONS[scenario] || SCENARIO_INSTRUCTIONS.default;
+    const scenarioExtra =
+      SCENARIO_INSTRUCTIONS[scenario] || SCENARIO_INSTRUCTIONS.default;
 
-const versionExtra =
-  VERSION_INSTRUCTIONS[versionType] || VERSION_INSTRUCTIONS.complete;
+    const lengthGuidance =
+      numericMaxWords > 0
+        ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
+        : "";
 
-const lengthGuidance =
-  numericMaxWords > 0
-    ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
-    : "";
-
-const rewriteFrame = `
+    const rewriteFrame = `
 You are rewriting an existing draft for the same scenario and output type.
 
 Rewrite the draft text below to:
 - Apply the user's rewrite instructions.
-- Preserve factual content that is supported by the original draft and sources.
+- Preserve factual content that is supported by the original draft.
 - Improve clarity, tone, and flow while following the STYLE GUIDE.
 - Keep the structure broadly similar unless the instructions request otherwise.
 
@@ -282,24 +194,22 @@ Existing draft to rewrite:
 """${text}"""
 `;
 
-const userPrompt =
-  baseFilled +
-  "\n\nScenario-specific guidance:\n" +
-  scenarioExtra.trim() +
-  "\n\nVersion-type guidance:\n" +
-  versionExtra.trim() +
-  "\n" +
-  lengthGuidance +
-  rewriteFrame;
-
+    const userPrompt =
+      baseFilled +
+      "\n\nScenario-specific guidance:\n" +
+      scenarioExtra.trim() +
+      "\n" +
+      lengthGuidance +
+      rewriteFrame;
 
     const systemPrompt =
       promptPack.systemPrompt +
       "\n\nYou must follow the STYLE GUIDE strictly. " +
-      "If the source uses currency symbols (e.g. $, €, £), rewrite them using the correct three-letter currency code " +
-      "(e.g. USD, EUR, GBP). Apply ALL formatting rules from the STYLE GUIDE consistently, even when the source does not." +
+      "If the source uses symbols (e.g., $, €, £), rewrite them into the proper currency code " +
+      "(e.g., USD, EUR, GBP). " +
+      "Apply ALL formatting rules consistently, even when the source does not." +
       "\n\nSTYLE GUIDE:\n" +
-      BASE_STYLE_GUIDE;
+      styleGuide;
 
     const completion = await client.chat.completions.create({
       model: modelId,
@@ -322,6 +232,7 @@ const userPrompt =
       outputText: output,
       scenario,
       outputType,
+      versionType,
     });
 
     return res.status(200).json({
@@ -339,6 +250,7 @@ const userPrompt =
         },
       ],
       scenario,
+      versionType,
     });
   } catch (err) {
     console.error("Error in /api/rewrite:", err);
