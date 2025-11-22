@@ -1,27 +1,27 @@
 // api/health.js
 
-export default async function handler(req, res) {
-  // CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+// --- CORS helper -------------------------------------------------
+function setCorsHeaders(req, res) {
+  const origin = req.headers.origin || "*";
 
-  // Handle preflight
+  // For the prototype, be permissive so frontend + localhost both work
+  res.setHeader("Access-Control-Allow-Origin", origin === "null" ? "*" : origin);
+  res.setHeader("Vary", "Origin");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+}
+// -----------------------------------------------------------------
+
+export default async function handler(req, res) {
+  setCorsHeaders(req, res);
+
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // Only allow GET for health checks
-  if (req.method !== "GET") {
+  if (req.method !== "GET" && req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Simple OK payload for the frontend "Check connection" button
-  return res.status(200).json({
-    status: "ok",
-    message: "Backend is healthy",
-  });
+  return res.status(200).json({ status: "ok", message: "Backend is healthy" });
 }
