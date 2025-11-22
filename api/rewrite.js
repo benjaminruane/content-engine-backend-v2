@@ -122,6 +122,29 @@ Write clear, concise, fact-based commentary aligned with the given scenario.
   `,
 };
 
+const VERSION_INSTRUCTIONS = {
+  complete: `
+Treat this as an internal, complete version.
+
+- You may keep all factual content from the draft where it is consistent with the sources.
+- You may include non-public details where they are relevant and not obviously sensitive,
+  but still avoid anything that looks like detailed deal terms or confidential fund economics.
+- Focus on improving clarity, flow and adherence to the WRITING GUIDELINES.
+  `,
+
+  public: `
+Treat this as an external, public-facing version.
+
+- Prefer information that is clearly public or clearly not sensitive.
+- Generalise or omit obviously sensitive elements such as detailed transaction terms,
+  non-public valuation or performance metrics, and fund economics.
+- You may keep neutral descriptive statements that are not obviously confidential,
+  even if they come from internal sources.
+- When in doubt, bias toward caution and higher-level wording.
+- Ensure the rewritten draft still follows the WRITING GUIDELINES and remains coherent.
+  `,
+};
+
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -195,16 +218,17 @@ export default async function handler(req, res) {
   }
 
   try {
-    const {
-      text,
-      notes,
-      outputType = "transaction_text",
-      scenario = "default",
-      modelId = "gpt-4o-mini",
-      temperature = 0.3,
-      maxTokens = 2048,
-      maxWords,
-    } = req.body || {};
+const {
+  text,
+  notes,
+  outputType = "transaction_text",
+  scenario = "default",
+  versionType = "complete",
+  modelId = "gpt-4o-mini",
+  temperature = 0.3,
+  maxTokens = 2048,
+  maxWords,
+} = req.body || {};
 
     if (!text || !text.trim()) {
       return res.status(400).json({ error: "Missing text" });
@@ -231,20 +255,23 @@ export default async function handler(req, res) {
       scenario,
     });
 
-    const scenarioExtra =
-      SCENARIO_INSTRUCTIONS[scenario] || SCENARIO_INSTRUCTIONS.default;
+const scenarioExtra =
+  SCENARIO_INSTRUCTIONS[scenario] || SCENARIO_INSTRUCTIONS.default;
 
-    const lengthGuidance =
-      numericMaxWords > 0
-        ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
-        : "";
+const versionExtra =
+  VERSION_INSTRUCTIONS[versionType] || VERSION_INSTRUCTIONS.complete;
 
-    const rewriteFrame = `
+const lengthGuidance =
+  numericMaxWords > 0
+    ? `\nLength guidance:\n- Aim for no more than approximately ${numericMaxWords} words.\n`
+    : "";
+
+const rewriteFrame = `
 You are rewriting an existing draft for the same scenario and output type.
 
 Rewrite the draft text below to:
 - Apply the user's rewrite instructions.
-- Preserve factual content that is supported by the original draft.
+- Preserve factual content that is supported by the original draft and sources.
 - Improve clarity, tone, and flow while following the STYLE GUIDE.
 - Keep the structure broadly similar unless the instructions request otherwise.
 
@@ -255,13 +282,16 @@ Existing draft to rewrite:
 """${text}"""
 `;
 
-    const userPrompt =
-      baseFilled +
-      "\n\nScenario-specific guidance:\n" +
-      scenarioExtra.trim() +
-      "\n" +
-      lengthGuidance +
-      rewriteFrame;
+const userPrompt =
+  baseFilled +
+  "\n\nScenario-specific guidance:\n" +
+  scenarioExtra.trim() +
+  "\n\nVersion-type guidance:\n" +
+  versionExtra.trim() +
+  "\n" +
+  lengthGuidance +
+  rewriteFrame;
+
 
     const systemPrompt =
       promptPack.systemPrompt +
